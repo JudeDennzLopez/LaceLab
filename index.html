@@ -165,7 +165,8 @@ def do_auth(mode):
 
 # ---------- FLOW ENGINE: pages, saved state, shared events ----------
 PAGES = dict(home="index.html", catalog="catalog.html", studio="customizer.html", cart="cart.html", login="login.html", signup="signup.html")
-def goto(v): window.location.href = PAGES.get(v, v)
+def goto(v):
+    window.location.href = "/LaceLab/" + PAGES.get(v, v)
 KEEP = ("cart", "promo", "pay", "d", "cat", "nxt", "err")
 def save_state():
     o = {k: S[k] for k in KEEP}; o["fav"] = sorted(S["fav"]); _save("ll_state", json.dumps(o))
