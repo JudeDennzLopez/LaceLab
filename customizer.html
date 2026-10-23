@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LaceLab — Customizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://pyscript.net/releases/2024.11.1/core.css">
+<script type="module" src="https://pyscript.net/releases/2024.11.1/core.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div class="bar">
+  <div class="logo" data-act="go" data-v="home"><i></i>LACELAB</div>
+  <nav id="nav"></nav>
+  <span id="acct" style="display:flex;gap:8px;align-items:center"></span>
+  <button class="cartb" data-act="go" data-v="cart">Cart <b id="cc">0</b></button>
+</div></header>
+<main id="app"><p class="mut">Loading Python engine…</p></main>
+<div id="layer"></div>
+<script type="py">
+# ===== SHARED (identical on every page: data, art, pricing, accounts, header, events) =====
+from pyscript import document as doc, window
+from pyodide.ffi import create_proxy
+import json, math
+
+# ---------- DATA ----------
+CATS = ["All", "University", "Corporate", "Y2K", "Anime", "Heavy Duty"]
+PRODUCTS = [
+ dict(id=1, n="Ateneo Blue Eagles Classic Satin", c="University", p=159, o=180, r=4.9, rv=342, b="Hot Seller", a="#1e40af", z="#e2e8f0", t="ATENEO • BLUE EAGLES"),
+ dict(id=2, n="Retro Y2K Star Patterned Lanyard", c="Y2K", p=139, o=0, r=4.8, rv=188, b="New", a="#c4b5fd", z="#f472b6", t="★ STAR GIRL ★ 2000"),
+ dict(id=3, n="Corporate Luxe Matte Black", c="Corporate", p=189, o=220, r=5.0, rv=512, b="Bulk Favorite", a="#171717", z="#fbbf24", t="STAFF • ACCESS"),
+ dict(id=4, n="Anime Pixel Cloud Pastel Gradient", c="Anime", p=149, o=0, r=4.9, rv=276, b="", a="#93c5fd", z="#f9a8d4", t="PIXEL CLOUD"),
+ dict(id=5, n="Matcha Floral Botanical ID Lace", c="Y2K", p=135, o=0, r=4.7, rv=94, b="", a="#86a789", z="#f5f5dc", t="matcha mornings"),
+ dict(id=6, n="Reflective Cyberpunk Neon Lanyard", c="Heavy Duty", p=195, o=0, r=4.9, rv=410, b="Reflective", a="#0f172a", z="#22d3ee", t="CYBER // NEON"),
+ dict(id=7, n="UP Oblation Classic", c="University", p=149, o=165, r=4.9, rv=2100, b="10% OFF", a="#7f1d1d", z="#15803d", t="UP DILIMAN • ISKO"),
+ dict(id=8, n="UST Glowing Gold Lace", c="University", p=149, o=165, r=4.9, rv=1800, b="10% OFF", a="#facc15", z="#171717", t="UST • TIGERS"),
+ dict(id=9, n="Cyberpunk Holographic", c="Y2K", p=180, o=0, r=5.0, rv=890, b="Hot", a="#7c3aed", z="#22d3ee", t="HOLO ✦ HOLO"),
+ dict(id=10, n="Gamer Guild Heavy Woven", c="Heavy Duty", p=170, o=0, r=4.8, rv=233, b="", a="#ea580c", z="#171717", t="LEVEL 99 • PLAYER ONE"),
+ dict(id=11, n="Sakura Anime Convention Pass", c="Anime", p=155, o=0, r=4.9, rv=301, b="New", a="#fda4af", z="#fff", t="サクラ • COSPLAY"),
+ dict(id=12, n="Event Crew Sunshine Lace", c="Corporate", p=129, o=145, r=4.6, rv=120, b="Bulk Favorite", a="#fbbf24", z="#4338ca", t="EVENT CREW"),
+]
+WIDTHS = {19: ("3/4\"", "19mm Compact", 140), 25: ("1.0\"", "25mm Standard", 165), 30: ("1.2\"", "30mm Bold", 190)}
+TEX = {"satin": ("Ultra-Smooth Satin", "Silky, high-gloss", 0), "woven": ("Durable Woven", "Heavy-duty daily", 0),
+       "holo": ("Holographic", "Rainbow flash", 25), "eco": ("Recycled Cotton", "Eco-friendly", 0)}
+COLORS = {"Midnight Indigo": "#4338ca", "Cherry Blossom": "#ff6b6b", "Forest Green": "#059669",
+          "Sunshine Yellow": "#fbbf24", "Jet Black": "#171717", "Electric Violet": "#7c3aed"}
+CLIPS = {"trigger": ("Trigger Snap", "Swivel hook", 0), "bulldog": ("Matte Bulldog", "Zero-twist bite", 0)}
+HOLD = {"none": ("None", 0), "acrylic": ("Clear Acrylic", 35), "magnetic": ("Mag-Silicone", 45)}
+FONTS = {"athletic": ("Athletic Bold", "800 italic", "Impact,sans-serif"), "clean": ("Clean Modern", "600", "Plus Jakarta Sans,sans-serif"),
+         "script": ("Aesthetic Script", "400 italic", "Georgia,serif")}
+PROMOS = {"STUDENT10": 0.10, "LACELAB20": 0.20}
+
+S = dict(view="home", cat="All", q="", sort="best", cart=[], promo="", pay="GCash", fav=set(),
+         d=dict(w=25, tex="satin", col="Midnight Indigo", text="DE LA SALLE UNIVERSITY • BS CS", font="athletic",
+                clip="trigger", brk=True, det=False, hold="acrylic", qty=1))
+
+def peso(x): return "₱{:,.2f}".format(x)
+def esc(s): return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+# ---------- LANYARD ART (SVG) ----------
+def lace(c1, c2, text, width=25, tex="satin", font="athletic", brk=False, hold="none", big=True, uid="x"):
+    w = 30 + (width - 19) * 1.6
+    fnt = FONTS[font]
+    pat = ""
+    if tex == "holo":
+        fill = f'<linearGradient id="h{uid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0abfc"/><stop offset=".35" stop-color="#67e8f9"/><stop offset=".7" stop-color="#fde68a"/><stop offset="1" stop-color="#f0abfc"/></linearGradient>'
+        base = f"url(#h{uid})"
+    else:
+        fill = ""; base = c1
+    sheen = {"satin": .35, "holo": .25, "woven": .08, "eco": .05}[tex]
+    weave = '<pattern id="w%s" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 0L6 6M6 0L0 6" stroke="#000" stroke-opacity=".12"/></pattern>' % uid if tex in ("woven", "eco") else ""
+    def strand(x, rot, label):
+        t = ""
+        if label:
+            t = f'<text transform="rotate(90 {x} 260)" x="{x}" y="{260 + w*.12}" text-anchor="middle" font-size="{w*.46}" fill="{c2}" style="font:{fnt[1]} {w*.46}px {fnt[2]}" letter-spacing=".05em">{esc(text)[:32]}</text>'
+        wv = f'<rect x="{x-w/2}" y="40" width="{w}" height="440" fill="url(#w{uid})"/>' if weave else ""
+        return (f'<g transform="rotate({rot} 300 40)"><rect x="{x-w/2}" y="40" width="{w}" height="440" rx="2" fill="{base}"/>{wv}'
+                f'<rect x="{x-w/2+3}" y="40" width="3" height="440" fill="#fff" opacity="{sheen}"/>'
+                f'<rect x="{x-w/2}" y="64" width="{w}" height="3" fill="{c2}" opacity=".8"/>{t}</g>')
+    brkc = '<rect x="283" y="486" width="34" height="14" rx="7" fill="#ef4444"/>' if brk else ""
+    bh = ""
+    if hold != "none":
+        hc = "rgba(255,255,255,.55)" if hold == "acrylic" else "#334155"
+        bh = f'<rect x="250" y="580" width="100" height="130" rx="12" fill="{hc}" stroke="#94a3b8" stroke-width="2"/><rect x="262" y="606" width="76" height="86" rx="6" fill="#fff"/><circle cx="300" cy="630" r="12" fill="#cbd5e1"/><rect x="274" y="652" width="52" height="6" rx="3" fill="#cbd5e1"/><rect x="282" y="666" width="36" height="6" rx="3" fill="#e2e8f0"/><rect x="285" y="586" width="30" height="8" rx="4" fill="#475569"/>'
+    h = 720 if big else 520
+    return (f'<svg viewBox="0 0 600 {h}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lanyard preview" style="width:100%;height:100%;max-height:100%">'
+            f'<defs>{fill}{weave}</defs><ellipse cx="300" cy="{h-18}" rx="90" ry="8" fill="#0f172a" opacity=".1"/>'
+            f'{strand(300-w*.9, 4, True)}{strand(300+w*.9, -4, False)}'
+            f'<rect x="{300-w*1.7}" y="448" width="{w*3.4}" height="14" rx="4" fill="#cbd5e1" stroke="#94a3b8"/>{brkc}'
+            f'<path d="M300 500 v38 M284 538 h32 v22 a16 16 0 0 1 -32 0z" fill="none" stroke="#64748b" stroke-width="5" stroke-linecap="round"/>{bh if big else ""}</svg>')
+
+# ---------- PRICING ----------
+def unit(d):
+    u = WIDTHS[d["w"]][2] + TEX[d["tex"]][2] + HOLD[d["hold"]][1] + (15 if d["brk"] else 0) + (20 if d["det"] else 0)
+    return u
+def disc(q): return 0.30 if q >= 20 else 0.15 if q >= 5 else 0.0
+def cart_count(): return sum(i["qty"] for i in S["cart"])
+def subtotal(): return sum(i["price"] * i["qty"] for i in S["cart"])
+
+def toast(msg):
+    t = doc.createElement("div"); t.className = "toast"; t.textContent = msg
+    doc.body.appendChild(t)
+    window.setTimeout(create_proxy(lambda *a: t.remove()), 1800)
+
+def add_ready(pid):
+    p = next(x for x in PRODUCTS if x["id"] == pid)
+    for i in S["cart"]:
+        if i.get("pid") == pid:
+            i["qty"] += 1; break
+    else:
+        S["cart"].append(dict(k=f"p{pid}", pid=pid, name=p["n"], desc=f'{p["c"]} • ready-to-wear', price=p["p"], qty=1, a=p["a"], z=p["z"], t=p["t"], tex="satin", w=25, font="clean"))
+    toast("Added to cart ✓"); refresh_nav()
+
+def add_custom():
+    d = S["d"]; k = json.dumps(d, sort_keys=True)
+    q = d["qty"]; price = round(unit(d) * (1 - disc(q)), 2)
+    clip = "Breakaway" if d["brk"] else CLIPS[d["clip"]][0]
+    S["cart"].append(dict(k=k, name="Custom Studio Lanyard", desc=f'{WIDTHS[d["w"]][0]} {TEX[d["tex"]][0]}, {d["col"]}, {clip}' + (", Detachable" if d["det"] else "") + (f', {HOLD[d["hold"]][0]} holder' if d["hold"] != "none" else ""),
+        price=price, qty=q, a=COLORS[d["col"]], z="#ffffff", t=d["text"], tex=d["tex"], w=d["w"], font=d["font"], brk=d["brk"], hold=d["hold"]))
+    toast(f"{q} custom lace(s) added ✓"); refresh_nav()
+
+# ---------- ACCOUNTS (demo: stored in this browser's localStorage) ----------
+import hashlib, re
+def _ls(k):
+    try: return window.localStorage.getItem(k)
+    except Exception: return None
+def _save(k, v):
+    try: window.localStorage.setItem(k, v)
+    except Exception: pass
+def users():
+    try: return json.loads(_ls("ll_users") or "{}")
+    except Exception: return {}
+def hp(email, pw): return hashlib.sha256(("lacelab:" + email + pw).encode()).hexdigest()
+
+S.update(user=None, err="", email="", nm="", nxt="index.html")
+_se = _ls("ll_session")
+if _se and _se in users(): S["user"] = dict(name=users()[_se]["name"], email=_se)
+
+def greet():
+    return f'<p style="margin:0 0 10px;font-weight:600">Mabuhay, {esc(S["user"]["name"])}! ✨</p>' if S["user"] else ""
+
+def do_auth(mode):
+    el = lambda i: doc.getElementById(i)
+    email = el("au-email").value.strip().lower(); pw = el("au-pw").value
+    S["email"] = email; S["err"] = ""
+    if mode == "signup": S["nm"] = el("au-name").value.strip()
+    U = users()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email): S["err"] = "Enter a valid email address."
+    elif len(pw) < 6: S["err"] = "Password must be at least 6 characters."
+    elif mode == "signup":
+        if not S["nm"]: S["err"] = "Tell us your name."
+        elif pw != el("au-pw2").value: S["err"] = "Passwords don't match."
+        elif email in U: S["err"] = "That email already has an account. Try logging in."
+        else:
+            U[email] = dict(name=S["nm"], h=hp(email, pw)); _save("ll_users", json.dumps(U))
+    elif email not in U or U[email]["h"] != hp(email, pw):
+        S["err"] = "Email or password is incorrect."
+    if S["err"]: return False
+    S["user"] = dict(name=U[email]["name"], email=email); _save("ll_session", email)
+    nx = S["nxt"]; S["nxt"] = "index.html"; S["email"] = ""; S["nm"] = ""; save_state(); goto(nx)
+    toast("Welcome, " + S["user"]["name"].split()[0] + "! ✓")
+    return True
+
+
+# ---------- FLOW ENGINE: pages, saved state, shared events ----------
+PAGES = dict(home="index.html", catalog="catalog.html", studio="customizer.html", cart="cart.html", login="login.html", signup="signup.html")
+def goto(v): window.location.href = PAGES.get(v, v)
+KEEP = ("cart", "promo", "pay", "d", "cat", "nxt", "err")
+def save_state():
+    o = {k: S[k] for k in KEEP}; o["fav"] = sorted(S["fav"]); _save("ll_state", json.dumps(o))
+def load_state():
+    try:
+        o = json.loads(_ls("ll_state") or "{}")
+        S.update({k: o[k] for k in KEEP if k in o}); S["fav"] = set(o.get("fav", []))
+    except Exception: pass
+load_state()
+_view = [None]; ACTIONS = {}; INPUTS = []
+def card(p):
+    old = f'<span class="old">₱{p["o"]}</span>' if p["o"] else ""
+    bd = f'<span class="badge">{p["b"]}</span>' if p["b"] else ""
+    fav = "♥" if p["id"] in S["fav"] else "♡"
+    return f'''<div class="card pc"><div class="stage">{bd}<button data-act="fav" data-id="{p["id"]}" aria-label="Favorite" style="position:absolute;top:8px;right:12px;font-size:22px;color:var(--coral);z-index:2">{fav}</button>{lace(p["a"], p["z"], p["t"], 25, "satin", "clean", big=False, uid="c%d" % p["id"])}</div>
+    <div style="padding:12px 6px 4px"><div class="mut">★ {p["r"]} ({p["rv"]:,})</div><div style="font-weight:700;margin:2px 0 10px;min-height:44px">{esc(p["n"])}</div>
+    <div class="row"><div><span class="price">₱{p["p"]}</span>{old}</div><button class="btn ind" style="padding:8px 14px" data-act="add" data-id="{p["id"]}">+ Add</button></div></div></div>'''
+
+NAMES = dict(home="Home", studio="Customizer", catalog="Catalog", cart="Cart")
+
+def refresh_nav():
+    save_state()
+    doc.getElementById("nav").innerHTML = "".join(f'<button class="{"on" if k==S["view"] else ""}" data-act="go" data-v="{k}">{v}</button>' for k, v in NAMES.items() if k != "cart")
+    doc.getElementById("cc").textContent = str(cart_count())
+    u = S["user"]
+    doc.getElementById("acct").innerHTML = (f'<span class="mut" style="font-weight:600">Hi, {esc(u["name"].split()[0])}</span><button class="btn ghost" style="padding:8px 16px" data-act="logout">Log out</button>' if u
+        else '<button class="btn ghost" style="padding:8px 16px" data-act="go" data-v="login">Log in</button><button class="btn ind" style="padding:8px 16px" data-act="go" data-v="signup">Sign up</button>')
+
+def render(keep_focus=None):
+    doc.getElementById("app").innerHTML = _view[0]()
+    refresh_nav()
+    if keep_focus:
+        el = doc.getElementById(keep_focus)
+        if el: 
+            el.focus(); n = len(el.value); el.setSelectionRange(n, n)
+
+def modal(html):
+    doc.getElementById("layer").innerHTML = f'<div class="modal" data-act="close"><div>{html}</div></div>'
+
+
+# ---------- SHARED EVENTS ----------
+def _go(el, v, e): S["err"] = ""; save_state(); goto(v); return False
+def _add(el, v, e): add_ready(int(el.dataset.id)); return False
+def _fav(el, v, e): S["fav"] ^= {int(el.dataset.id)}
+def _logout(el, v, e): S["user"] = None; _save("ll_session", ""); save_state(); goto("home"); return False
+def _auth(el, v, e): do_auth(v)
+def _close(el, v, e):
+    if e.target is el or el.tagName == "BUTTON": doc.getElementById("layer").innerHTML = ""
+    return False
+ACTIONS.update(go=_go, add=_add, fav=_fav, logout=_logout, auth=_auth, close=_close)
+def on_click(e):
+    el = e.target.closest("[data-act]")
+    if not el: return
+    fn = ACTIONS.get(el.dataset.act)
+    if fn and fn(el, el.getAttribute("data-v"), e) is not False: render()
+def on_input(e):
+    for f in INPUTS: f(e)
+def start(name, fn):
+    S["view"] = name; _view[0] = fn
+    for ev, h in (("click", on_click), ("input", on_input), ("change", on_input)): doc.addEventListener(ev, create_proxy(h))
+    render()
+
+# ===== THIS PAGE: Customizer =====
+def v_studio():
+    d = S["d"]; u = unit(d); q = d["qty"]; dc = disc(q); tot = u * q * (1 - dc)
+    def tiles(items, key, fmt):
+        return "".join(f'<button class="tile {"on" if d[key]==k else ""}" data-act="set" data-k="{key}" data-v="{k}">{fmt(k, v)}</button>' for k, v in items.items())
+    def add(n): return "Included" if n == 0 else f"+₱{n}"
+    sw = "".join(f'<button class="sw {"on" if d["col"]==n else ""}" style="background:{c}" aria-label="{n}" data-act="set" data-k="col" data-v="{n}"></button>' for n, c in COLORS.items())
+    hold = "".join(f'<button class="tile {"on" if d["hold"]==k else ""}" data-act="set" data-k="hold" data-v="{k}"><b>{v[0]}</b><span class="mut">{"+₱%d" % v[1] if v[1] else "₱0"}</span></button>' for k, v in HOLD.items())
+    return f'''<div class="studio"><div class="stage"><span class="tag" style="position:absolute;top:16px;left:16px;background:var(--tan)">Unit {peso(u)} · est. 2–3 days</span>{lace(COLORS[d["col"]], "#fff", d["text"], d["w"], d["tex"], d["font"], d["brk"], d["hold"], True, "st")}</div>
+    <div class="opts"><div><h1 style="font-size:36px;line-height:44px">Studio customizer</h1><span class="mut">The preview updates as you click.</span></div>
+    <div><h3>1. Strap width</h3><div class="tiles">{tiles(WIDTHS, "w", lambda k, v: f'<b>{v[0]}</b><span class="mut">{v[1]}</span><br><span class="price" style="font-size:16px">₱{v[2]}</span>')}</div></div>
+    <div><h3>2. Fabric texture</h3><div class="tiles">{tiles(TEX, "tex", lambda k, v: f'<b>{v[0]}</b><span class="mut">{v[1]}</span><br><span class="mut">{add(v[2])}</span>')}</div></div>
+    <div><h3>3. Base palette — <span class="mut">{d["col"]}</span></h3>{sw}</div>
+    <div><h3>4. Your text</h3><input id="txt" class="txt" maxlength="32" value="{esc(d["text"])}" placeholder="School, company or handle"><div class="tiles" style="margin-top:10px">{tiles(FONTS, "font", lambda k, v: f'<b>{v[0]}</b>')}</div></div>
+    <div><h3>5. Hook &amp; hardware</h3><div class="tiles">{tiles(CLIPS, "clip", lambda k, v: f'<b>{v[0]}</b><span class="mut">{v[1]}</span>')}
+    <button class="tile {"on" if d["brk"] else ""}" data-act="tog" data-k="brk"><b>Breakaway clasp</b><span class="mut">+₱15</span></button>
+    <button class="tile {"on" if d["det"] else ""}" data-act="tog" data-k="det"><b>Detachable loop</b><span class="mut">+₱20</span></button></div></div>
+    <div><h3>6. Badge holder</h3><div class="tiles">{hold}</div></div>
+    <div class="row card" style="padding:14px 18px"><div><b>Quantity</b><div class="mut">5+ save 15% · 20+ save 30%{f' · <b style="color:var(--coral)">{int(dc*100)}% off applied</b>' if dc else ''}</div></div><div class="qty"><button data-act="qty" data-v="-1">−</button><b>{q}</b><button data-act="qty" data-v="1">+</button></div></div>
+    <div class="card dock"><div><span class="mut">Total estimated</span><div class="price" style="font-size:28px">{peso(tot)}</div></div><button class="btn coral" data-act="addc">Add to cart</button></div></div></div>'''
+
+
+def _set(el, v, e):
+    k = el.dataset.k; d = S["d"]; d[k] = int(v) if k == "w" else v
+    if k == "clip": d["brk"] = False
+def _tog(el, v, e):
+    k = el.dataset.k; d = S["d"]; d[k] = not d[k]
+    if k == "brk" and d[k]: d["clip"] = "trigger"
+def _qty(el, v, e): S["d"]["qty"] = max(1, min(500, S["d"]["qty"] + int(v)))
+def _addc(el, v, e): add_custom(); return False
+def _inp(e):
+    if e.target.id == "txt": S["d"]["text"] = e.target.value.upper(); render("txt")
+ACTIONS.update(set=_set, tog=_tog, qty=_qty, addc=_addc); INPUTS.append(_inp)
+start("studio", v_studio)
+
+</script>
+</body>
+</html>
