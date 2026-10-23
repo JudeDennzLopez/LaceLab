@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LaceLab — Log in</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://pyscript.net/releases/2024.11.1/core.css">
+<script type="module" src="https://pyscript.net/releases/2024.11.1/core.js"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header><div class="bar">
+  <div class="logo" data-act="go" data-v="home"><i></i>LACELAB</div>
+  <nav id="nav"></nav>
+  <span id="acct" style="display:flex;gap:8px;align-items:center"></span>
+  <button class="cartb" data-act="go" data-v="cart">Cart <b id="cc">0</b></button>
+</div></header>
+<main id="app"><p class="mut">Loading Python engine…</p></main>
+<div id="layer"></div>
+<script type="py" src="py/login.py" config="pyscript.json"></script>
+</body>
+</html>
